@@ -1,1 +1,0 @@
-import{j as e}from"./vendor-ui-BGGfvU-n.js";import{B as r}from"./badge-XQGYYPGp.js";const s=()=>e.jsx(r,{variant:"outline",className:"uppercase tracking-wider text-xs",children:"POC Mode"});export{s as P};

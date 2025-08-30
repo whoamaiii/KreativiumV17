@@ -4,13 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { AlertTriangle, CheckCircle, Eye, TrendingUp, MessageSquare } from "lucide-react";
+import { AlertTriangle, CheckCircle, Eye, TrendingUp } from "lucide-react";
 import { alertSystem, AlertHistoryEntry } from "@/lib/alertSystem";
 import { toast } from "sonner";
 import { logger } from '@/lib/logger';
 import { useTranslation } from '@/hooks/useTranslation';
-import { ENABLE_BIGSTIAN_AI } from '@/lib/env';
-import { generateExplainability } from '@/lib/ai/bigstian/orchestrator';
 
 interface AlertManagerProps {
   studentId?: string;
@@ -113,37 +111,6 @@ export const AlertManager = ({ studentId, showOnlyUnresolved = false }: AlertMan
     }
   };
 
-  const summarizeForParent = async (entry: AlertHistoryEntry) => {
-    try {
-      if (!ENABLE_BIGSTIAN_AI) {
-        toast.error('AI is disabled');
-        return;
-      }
-      const pattern = `${entry.alert.type}:${entry.alert.title}`;
-      const timeframe = 'recent period';
-      const contributing = [
-        `severity:${entry.alert.severity}`,
-        `dataPoints:${entry.alert.dataPoints}`,
-      ];
-      setSummaryOpen(true);
-      setSummaryLoading(true);
-      setSummaryText('');
-      const resp = await generateExplainability({
-        pattern,
-        confidence: 0.6,
-        timeframe,
-        contributingFactors: contributing,
-        options: { maxTokens: 120, temperature: 0.3 }
-      });
-      const text = `Parent summary: ${resp.text}`;
-      setSummaryText(text);
-    } catch (e) {
-      setSummaryText('Failed to summarize for parent');
-    } finally {
-      setSummaryLoading(false);
-    }
-  };
-
   if (alerts.length === 0) {
     return (
       <Card>
@@ -156,10 +123,6 @@ export const AlertManager = ({ studentId, showOnlyUnresolved = false }: AlertMan
       </Card>
     );
   }
-
-  const [summaryOpen, setSummaryOpen] = useState(false);
-  const [summaryLoading, setSummaryLoading] = useState(false);
-  const [summaryText, setSummaryText] = useState('');
 
   return (
     <div className="space-y-4">
@@ -207,18 +170,6 @@ export const AlertManager = ({ studentId, showOnlyUnresolved = false }: AlertMan
                     onClick={() => handleMarkAsViewed(alertEntry.alert.id)}
                   >
                     <Eye className="h-4 w-4" />
-                  </Button>
-                )}
-                {ENABLE_BIGSTIAN_AI && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => summarizeForParent(alertEntry)}
-                    title="Summarize for parent"
-                    aria-label="Summarize for parent"
-                  >
-                    <MessageSquare className="h-4 w-4 mr-1" />
-                    Parent summary
                   </Button>
                 )}
                 {!alertEntry.resolved && (
@@ -334,23 +285,5 @@ export const AlertManager = ({ studentId, showOnlyUnresolved = false }: AlertMan
         </Card>
       ))}
     </div>
-    <Dialog open={summaryOpen} onOpenChange={setSummaryOpen}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Parent summary</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-3">
-          {summaryLoading ? (
-            <div className="text-sm text-muted-foreground">Generating…</div>
-          ) : (
-            <pre className="whitespace-pre-wrap text-sm bg-muted/50 p-3 rounded">{summaryText}</pre>
-          )}
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setSummaryOpen(false)}>Close</Button>
-            <Button onClick={() => { try { navigator.clipboard?.writeText?.(summaryText); toast.success('Copied'); } catch {} }}>Copy</Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 };

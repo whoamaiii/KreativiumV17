@@ -13,12 +13,6 @@ import { useReportsWorker } from '@/hooks/useReportsWorker';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { ENABLE_BIGSTIAN_AI } from '@/lib/env';
-import { generateNarrative } from '@/lib/ai/bigstian/orchestrator';
-import { buildReportAnalyticsSummary } from '@/lib/ai/bigstian/context';
-import { NarrativeJson } from '@/lib/ai/bigstian/schemas';
-import AIStatusPanel from '@/components/ai/AIStatusPanel';
-import { useAIState } from '@/hooks/useAIState';
 
 const EXPORT_PREFS_KEY = 'sensory-tracker_export_prefs_v1';
 
@@ -36,11 +30,6 @@ const Reports = () => {
   const [customEnd, setCustomEnd] = useState<string>('');
   const [anonymize, setAnonymize] = useState<boolean>(false);
   const [backupUseFilters, setBackupUseFilters] = useState<boolean>(false);
-  const { aiEnabled, setAiEnabled, featureFlagEnabled } = useAIState();
-  const [aiLoading, setAiLoading] = useState<boolean>(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiNarrative, setAiNarrative] = useState<NarrativeJson | null>(null);
-  const [progressMessage, setProgressMessage] = useState<string>('');
 
   useEffect(() => {
     try {
@@ -55,8 +44,6 @@ const Reports = () => {
       }
     } catch {}
   }, []);
-
-  // Removed duplicate localStorage persistence - now handled by useAIState hook
 
   useEffect(() => {
     try {
@@ -111,97 +98,6 @@ const Reports = () => {
     }
   }, []);
 
-  const generateAINarrative = useCallback(async () => {
-    setAiError(null);
-    setAiLoading(true);
-    
-    // Run diagnostics first if in development
-    if (import.meta.env.DEV) {
-      const { runAIDiagnostics } = await import('@/lib/ai/diagnostics');
-      await runAIDiagnostics();
-    }
-    
-    try {
-      const { students, trackingEntries, goals } = loadAllData();
-      if (students.length === 0) throw new Error('No students available');
-      const student = pdfStudentId ? students.find(s => s.id === pdfStudentId) : students[0];
-      if (!student) throw new Error('Selected student not found');
-
-      const entries = trackingEntries.filter(t => t.studentId === student.id);
-      const emotions = entries.flatMap(e => e.emotions);
-      const sensory = entries.flatMap(e => e.sensoryInputs);
-      const studentGoals = goals.filter(g => g.studentId === student.id);
-
-      const summaryCtx = buildReportAnalyticsSummary(
-        student,
-        entries,
-        emotions,
-        sensory,
-        studentGoals,
-        computedDateRange
-      );
-
-      const input = {
-        studentProfile: { grade: summaryCtx.studentSanitized.grade },
-        timeframe: summaryCtx.summary.timeframe,
-        highlights: summaryCtx.summary.highlights,
-        statsSummary: summaryCtx.summary.statsSummary,
-        goals: summaryCtx.summary.goals,
-      };
-
-      const result = await generateNarrative({ input, temperature: 0.3, maxTokens: 384 });
-      setAiNarrative(result);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'AI narrative failed';
-      setAiError(msg);
-      logger.error('AI narrative failed', { error: e });
-    } finally {
-      setAiLoading(false);
-    }
-  }, [loadAllData, pdfStudentId, computedDateRange]);
-
-  const strictRepairAINarrative = useCallback(async () => {
-    setAiError(null);
-    setAiLoading(true);
-    try {
-      const { students, trackingEntries, goals } = loadAllData();
-      if (students.length === 0) throw new Error('No students available');
-      const student = pdfStudentId ? students.find(s => s.id === pdfStudentId) : students[0];
-      if (!student) throw new Error('Selected student not found');
-
-      const entries = trackingEntries.filter(t => t.studentId === student.id);
-      const emotions = entries.flatMap(e => e.emotions);
-      const sensory = entries.flatMap(e => e.sensoryInputs);
-      const studentGoals = goals.filter(g => g.studentId === student.id);
-
-      const summaryCtx = buildReportAnalyticsSummary(
-        student,
-        entries,
-        emotions,
-        sensory,
-        studentGoals,
-        computedDateRange
-      );
-
-      const input = {
-        studentProfile: { grade: summaryCtx.studentSanitized.grade },
-        timeframe: summaryCtx.summary.timeframe,
-        highlights: summaryCtx.summary.highlights,
-        statsSummary: summaryCtx.summary.statsSummary,
-        goals: summaryCtx.summary.goals,
-      };
-
-      const result = await generateNarrative({ input, temperature: 0.2, maxTokens: 768 });
-      setAiNarrative(result);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'AI narrative strict repair failed';
-      setAiError(msg);
-      logger.error('AI narrative strict repair failed', { error: e });
-    } finally {
-      setAiLoading(false);
-    }
-  }, [loadAllData, pdfStudentId, computedDateRange]);
-
   const handleExportCSV = useCallback(async () => {
     setIsExporting(true);
     try {
@@ -221,12 +117,7 @@ const Reports = () => {
           dateRange: computedDateRange,
           anonymize,
         },
-        onProgress: ({ progress, message }) => {
-          setProgress(Math.round(progress * 100));
-          if (message) {
-            setProgressMessage(message);
-          }
-        },
+        onProgress: ({ progress }) => setProgress(Math.round(progress * 100)),
       });
       const blob = new Blob([content], { type: 'text/csv' });
       const filename = `sensory_tracker_full_export_${new Date().toISOString().split('T')[0]}.csv`;
@@ -237,7 +128,6 @@ const Reports = () => {
       toast.error(tSettings('dataExport.error_generic'));
     } finally {
       setIsExporting(false);
-      setProgressMessage('');
     }
   }, [loadAllData, run, computedDateRange, anonymize, tSettings]);
 
@@ -260,12 +150,7 @@ const Reports = () => {
           dateRange: computedDateRange,
           anonymize,
         },
-        onProgress: ({ progress, message }) => {
-          setProgress(Math.round(progress * 100));
-          if (message) {
-            setProgressMessage(message);
-          }
-        },
+        onProgress: ({ progress }) => setProgress(Math.round(progress * 100)),
       });
       const blob = new Blob([content], { type: 'application/json' });
       const filename = `sensory_tracker_full_export_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
@@ -276,7 +161,6 @@ const Reports = () => {
       toast.error(tSettings('dataExport.error_generic'));
     } finally {
       setIsExporting(false);
-      setProgressMessage('');
     }
   }, [loadAllData, run, computedDateRange, anonymize, tSettings]);
 
@@ -309,7 +193,6 @@ const Reports = () => {
       toast.error(tSettings('dataExport.error_generic'));
     } finally {
       setIsExporting(false);
-      setProgressMessage('');
     }
   }, [loadAllData, backupUseFilters, computedDateRange, tSettings]);
 
@@ -330,8 +213,6 @@ const Reports = () => {
 
         <Card className="bg-gradient-card border-0 shadow-soft">
           <CardContent className="p-6 space-y-4">
-            {/* BigstianAI Status */}
-            <AIStatusPanel value={aiEnabled} onChange={setAiEnabled} featureFlagEnabled={featureFlagEnabled} />
             <div className="grid gap-4 md:grid-cols-3">
               <div>
                 <Label className="mb-2 block">{tCommon('reports.exportFilters.dateRange')}</Label>
@@ -382,7 +263,6 @@ const Reports = () => {
                 <Checkbox id="anonymize" checked={anonymize} onCheckedChange={(c) => setAnonymize(!!c)} />
                 <Label htmlFor="anonymize">{tCommon('reports.exportFilters.anonymize')}</Label>
               </div>
-              {/* AI toggle handled by AIStatusPanel above */}
               <div className="flex items-center gap-2 md:col-start-3">
                 <Checkbox id="backupFilters" checked={backupUseFilters} onCheckedChange={(c) => setBackupUseFilters(!!c)} />
                 <Label htmlFor="backupFilters">{tCommon('reports.exportFilters.backupUseFilters')}</Label>
@@ -402,7 +282,7 @@ const Reports = () => {
                   ? tCommon('reports.exportFilters.summary.allAnon')
                   : tCommon('reports.exportFilters.summary.all');
               })()}
-              {isExporting ? ` • ${progressMessage || tCommon('reports.exportFilters.summary.progress', { percent: progress })}` : ''}
+              {isExporting ? ` • ${tCommon('reports.exportFilters.summary.progress', { percent: progress })}` : ''}
             </p>
 
             <div className="flex flex-wrap gap-3">
@@ -415,32 +295,6 @@ const Reports = () => {
               <Button variant="outline" onClick={handleCreateBackup} disabled={isExporting} aria-busy={isExporting} data-testid="create-backup">
                 <Save className="h-4 w-4 mr-2" />{tSettings('dataExport.actions.createBackup')}
               </Button>
-              {ENABLE_BIGSTIAN_AI && aiEnabled && (
-                <Button
-                  variant="default"
-                  onClick={generateAINarrative}
-                  disabled={aiLoading || customRangeInvalid}
-                  aria-busy={aiLoading}
-                  data-testid="ai-generate-narrative"
-                >
-                  {aiLoading ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="animate-spin inline-block w-3 h-3 rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
-                      Generating…
-                    </span>
-                  ) : 'Generate AI Narrative'}
-                </Button>
-              )}
-              {ENABLE_BIGSTIAN_AI && aiEnabled && (
-                <Button
-                  variant="outline"
-                  onClick={strictRepairAINarrative}
-                  disabled={aiLoading || customRangeInvalid}
-                  aria-busy={aiLoading}
-                >
-                  Strict Repair
-                </Button>
-              )}
             </div>
 
             {/* Analytics PDF quick access */}
@@ -484,39 +338,6 @@ const Reports = () => {
             </p>
 
             <p className="text-xs text-muted-foreground">{tSettings('dataExport.note')}</p>
-
-            {ENABLE_BIGSTIAN_AI && aiEnabled && (
-              <div className="mt-8">
-                <h3 className="text-lg font-semibold text-foreground mb-2">AI Narrative (Preview)</h3>
-                {aiError && (
-                  <p className="text-sm text-destructive mb-2" role="alert">{aiError}</p>
-                )}
-                {aiNarrative ? (
-                  <div className="space-y-4 rounded-xl border border-primary/10 p-4 bg-background/60">
-                    {aiNarrative.sections.map((sec, i) => (
-                      <div key={i} className="space-y-2">
-                        <h4 className="text-base font-semibold">{sec.title}</h4>
-                        {sec.paragraphs.map((p, j) => (
-                          <p key={j} className="text-sm text-foreground/90">{p}</p>
-                        ))}
-                        {sec.bullets && sec.bullets.length > 0 && (
-                          <ul className="list-disc pl-5 text-sm text-foreground/90">
-                            {sec.bullets.map((b, k) => (
-                              <li key={k}>{b}</li>
-                            ))}
-                          </ul>
-                        )}
-                      </div>
-                    ))}
-                    <div className="text-xs text-muted-foreground">
-                      Confidence: {(aiNarrative.meta.confidence * 100).toFixed(0)}% • Timeframe: {aiNarrative.meta.timeframe}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Use "Generate AI Narrative" to create a draft you can edit before export.</p>
-                )}
-              </div>
-            )}
           </CardContent>
         </Card>
       </div>

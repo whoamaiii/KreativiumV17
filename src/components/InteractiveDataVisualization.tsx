@@ -243,9 +243,7 @@ export const InteractiveDataVisualization = memo<InteractiveDataVisualizationPro
               analysis={analysisData as any}
               activePreset={visualizationState.activePreset}
               onCreateGoal={() => { /* wire later: route to goals with draft */ }}
-              onAddIntervention={() => {
-                window.dispatchEvent(new CustomEvent('sensoryTracker:addIntervention', { detail: { studentName } }));
-              }}
+              onAddIntervention={() => { /* wire later */ }}
               onScheduleBreak={() => { /* wire later */ }}
               onJumpToTracking={() => { /* wire later */ }}
             />

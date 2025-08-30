@@ -47,13 +47,6 @@ class ErrorHandler {
     // Handle global errors
     window.addEventListener('error', (event) => {
       event.preventDefault();
-      // Filter benign ResizeObserver loop errors often triggered by popovers/dropdowns
-      const msg = event?.message || event?.error?.message || '';
-      if (msg.includes('ResizeObserver loop completed') || msg.includes('ResizeObserver loop limit exceeded')) {
-        // Log at debug level and ignore to avoid noisy dev toasts
-        try { logger.warn('Ignored benign ResizeObserver error'); } catch {}
-        return;
-      }
       this.handle(event.error);
     });
   }

@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,13 +15,6 @@ import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
 import { toast } from "sonner";
 import { downloadBlob } from "@/lib/utils";
 import { useTranslation } from '@/hooks/useTranslation';
-import { ENABLE_BIGSTIAN_AI } from '@/lib/env';
-import { buildReportAnalyticsSummary } from '@/lib/ai/bigstian/context';
-import { generateNarrative } from '@/lib/ai/bigstian/orchestrator';
-import type { NarrativeJson } from '@/lib/ai/bigstian/schemas';
-import { useAIState } from '@/hooks/useAIState';
-import { generateAINarrativeHTML } from '@/lib/utils/aiNarrativeUtils';
-import AIStatusPanel from '@/components/ai/AIStatusPanel';
 
 interface ReportBuilderProps {
   student: Student;
@@ -69,11 +62,6 @@ export const ReportBuilder = ({ student, goals, trackingEntries, emotions, senso
   const { tCommon } = useTranslation();
   const [showBuilder, setShowBuilder] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<string>('progress-summary');
-  const { aiEnabled, setAiEnabled, featureFlagEnabled } = useAIState();
-  const [aiLoading, setAiLoading] = useState<boolean>(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiNarrative, setAiNarrative] = useState<NarrativeJson | null>(null);
-  const [tone, setTone] = useState<'professional_iep' | 'parent_friendly' | 'action_coaching' | 'research_summary'>('professional_iep');
   const [reportData, setReportData] = useState({
     title: '',
     dateRange: {
@@ -88,44 +76,6 @@ export const ReportBuilder = ({ student, goals, trackingEntries, emotions, senso
     schoolDistrict: ''
   });
   const printRef = useRef<HTMLDivElement>(null);
-  const aiSectionRef = useRef<HTMLDivElement>(null);
-
-  // Removed duplicate localStorage persistence - now handled by useAIState hook
-
-  const handleGenerateAINarrative = async () => {
-    if (!aiEnabled) return;
-    setAiError(null);
-    setAiLoading(true);
-    try {
-      const start = new Date(reportData.dateRange.start);
-      const end = new Date(reportData.dateRange.end);
-      const { studentSanitized, summary } = buildReportAnalyticsSummary(
-        student,
-        trackingEntries,
-        emotions,
-        sensoryInputs,
-        goals,
-        isNaN(start.getTime()) || isNaN(end.getTime()) ? undefined : { start, end }
-      );
-
-      const input = {
-        studentProfile: { grade: studentSanitized.grade },
-        timeframe: summary.timeframe,
-        highlights: summary.highlights,
-        statsSummary: summary.statsSummary,
-        goals: summary.goals,
-      };
-
-      const res = await generateNarrative({ input, temperature: 0.3, maxTokens: 384, tone });
-      setAiNarrative(res);
-    } catch (e) {
-      setAiError(e instanceof Error ? e.message : 'AI narrative failed');
-    } finally {
-      setAiLoading(false);
-    }
-    // Bring AI section into view after generation
-    setTimeout(() => aiSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
-  };
 
   const handleTemplateChange = (templateId: string) => {
     const template = reportTemplates.find(t => t.id === templateId);
@@ -230,8 +180,6 @@ export const ReportBuilder = ({ student, goals, trackingEntries, emotions, senso
     
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-
-    const aiSection = generateAINarrativeHTML(aiNarrative);
 
     const htmlContent = `
       <!DOCTYPE html>
@@ -445,8 +393,6 @@ export const ReportBuilder = ({ student, goals, trackingEntries, emotions, senso
             </div>
           ` : ''}
 
-          ${aiSection}
-
           <div class="section">
             <h2>Data Collection Summary</h2>
             <p>This report is based on ${reportAnalysis.totalSessions} tracking sessions, ${emotions.length} emotional observations, and ${sensoryInputs.length} sensory input recordings collected from ${format(reportAnalysis.period.start, 'MMMM dd, yyyy')} to ${format(reportAnalysis.period.end, 'MMMM dd, yyyy')}.</p>
@@ -516,59 +462,6 @@ export const ReportBuilder = ({ student, goals, trackingEntries, emotions, senso
 
   return (
     <div className="space-y-4">
-      {/* BigstianAI Section */}
-      {ENABLE_BIGSTIAN_AI && (
-        <Card className="border border-primary/20" ref={aiSectionRef}>
-          <CardContent className="p-4 space-y-4">
-            <AIStatusPanel value={aiEnabled} onChange={setAiEnabled} featureFlagEnabled={featureFlagEnabled} />
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Select value={tone} onValueChange={(v) => setTone(v as any)}>
-                  <SelectTrigger className="h-8 w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="professional_iep">Professional (IEP)</SelectItem>
-                    <SelectItem value="parent_friendly">Parent-friendly</SelectItem>
-                    <SelectItem value="action_coaching">Action coaching</SelectItem>
-                    <SelectItem value="research_summary">Research summary</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button onClick={handleGenerateAINarrative} disabled={!aiEnabled || aiLoading} className="h-8">
-                  {aiLoading ? (
-                    <span className="inline-flex items-center gap-2">
-                      <span className="animate-spin inline-block w-3 h-3 rounded-full border-2 border-current border-t-transparent" aria-hidden="true"></span>
-                      Generating…
-                    </span>
-                  ) : 'Generate AI Narrative'}
-                </Button>
-              </div>
-            </div>
-            {aiError && (
-              <div className="mt-2 text-xs text-destructive">{aiError}</div>
-            )}
-            {aiNarrative && (
-              <div className="mt-4 space-y-3 rounded-lg border border-primary/10 p-3 bg-background/60">
-                {aiNarrative.sections.map((s, i) => (
-                  <div key={i} className="space-y-1">
-                    <div className="text-sm font-semibold">{s.title}</div>
-                    {s.paragraphs.map((p, j) => (
-                      <p key={j} className="text-sm text-foreground/90">{p}</p>
-                    ))}
-                    {s.bullets && s.bullets.length > 0 && (
-                      <ul className="list-disc pl-5 text-sm">
-                        {s.bullets.map((b, k) => (<li key={k}>{b}</li>))}
-                      </ul>
-                    )}
-                  </div>
-                ))}
-                <div className="text-xs text-muted-foreground">Confidence: {(aiNarrative.meta.confidence * 100).toFixed(0)}% • Timeframe: {aiNarrative.meta.timeframe}</div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
-
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold">{tCommon('reports.builder.title')}</h3>
@@ -761,22 +654,6 @@ export const ReportBuilder = ({ student, goals, trackingEntries, emotions, senso
               <Badge variant="outline" className="text-xs">
                 {tCommon('reports.sectionsCount', { count: template.sections.length })}
               </Badge>
-              {ENABLE_BIGSTIAN_AI && aiEnabled && (
-                <div className="mt-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleTemplateChange(template.id);
-                      setShowBuilder(true);
-                      void handleGenerateAINarrative();
-                    }}
-                  >
-                    AI Narrative
-                  </Button>
-                </div>
-              )}
             </CardContent>
           </Card>
         ))}

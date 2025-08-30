@@ -1,7 +1,7 @@
-import React, { memo, useEffect, useState } from 'react';
+import React, { memo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-// import { Badge } from '@/components/ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { Brain, Eye, BarChart3, Clock, Info, TrendingUp } from 'lucide-react';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
 import { useAnalyticsWorker } from '@/hooks/useAnalyticsWorker';
@@ -11,10 +11,6 @@ import { generateInsightsStructured } from '@/lib/insights';
 import { stableKeyFromPattern } from '@/lib/key';
 import { useTranslation } from '@/hooks/useTranslation';
 import { hashOfString } from '@/lib/key';
-import { enhancedPatternAnalysis } from '@/lib/enhancedPatternAnalysis';
-import { ConfidenceIndicator } from '@/components/ConfidenceIndicator';
-import { ENABLE_BIGSTIAN_AI } from '@/lib/env';
-import { parseDaysFromTimeframe } from '@/lib/ai/bigstian/utils';
 
 export interface PatternsPanelProps {
   filteredData: {
@@ -37,15 +33,15 @@ const getPatternIcon = (type: string): React.ReactElement => {
   }
 };
 
-// Replaced Badge confidence with reusable ConfidenceIndicator component
+const getConfidenceColor = (confidence: number): string => {
+  if (confidence > 0.7) return 'text-green-600';
+  if (confidence > 0.4) return 'text-yellow-600';
+  return 'text-orange-600';
+};
 
 export const PatternsPanel = memo(function PatternsPanel({ filteredData }: PatternsPanelProps): React.ReactElement {
   const { results, isAnalyzing, error, runAnalysis } = useAnalyticsWorker({ precomputeOnIdle: false });
   const { tAnalytics } = useTranslation();
-  const [aiBusy, setAiBusy] = useState<Record<string, boolean>>({});
-  const [aiText, setAiText] = useState<Record<string, string>>({});
-  const [aiErr, setAiErr] = useState<Record<string, string>>({});
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     runAnalysis(filteredData);
@@ -55,38 +51,6 @@ export const PatternsPanel = memo(function PatternsPanel({ filteredData }: Patte
   }, [filteredData, runAnalysis]);
 
   const patterns: PatternResult[] = results?.patterns || [];
-  const requestAIExplain = async (pattern: PatternResult) => {
-    const key = stableKeyFromPattern(pattern);
-    setAiBusy(prev => ({ ...prev, [key]: true }));
-    setAiErr(prev => ({ ...prev, [key]: '' }));
-    try {
-      const timeframe = String(pattern.timeframe || 'recent period');
-      const contributing = [
-        `type:${pattern.type}`,
-        `dataPoints:${pattern.dataPoints}`,
-        `frequency:${pattern.frequency}`,
-      ];
-      const resp = await enhancedPatternAnalysis.explainTopPattern(
-        pattern.pattern,
-        Math.max(0, Math.min(1, pattern.confidence || 0)),
-        timeframe,
-        contributing
-      );
-      if (resp) {
-        setAiText(prev => ({ ...prev, [key]: resp.text }));
-      }
-    } catch (e) {
-      setAiErr(prev => ({ ...prev, [key]: 'AI explanation failed' }));
-    } finally {
-      setAiBusy(prev => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const parseDays = (tf?: string): number => {
-    if (!tf) return 0;
-    const m = tf.match(/(\d+)\s*day/);
-    return m ? Number(m[1]) : 0;
-  };
   const structured = generateInsightsStructured(
     {
       patterns: results?.patterns || [],
@@ -140,58 +104,30 @@ export const PatternsPanel = memo(function PatternsPanel({ filteredData }: Patte
                                 .replace('-', ' ')
                                 .replace(/\b\w/g, (l: string) => l.toUpperCase())}
                             </h4>
-                            {ENABLE_BIGSTIAN_AI && (
-                              <>
-                                <button
+                            <HoverCard openDelay={100} closeDelay={80}>
+                              <HoverCardTrigger asChild>
+                            <button
                                   aria-label={String(tAnalytics('insights.explainPattern'))}
-                                  className="inline-flex items-center gap-1 rounded-full border border-primary/40 px-2.5 py-1 text-xs leading-none text-primary hover:bg-primary/10"
-                                  onClick={() => {
-                                    const key = stableKeyFromPattern(pattern);
-                                    setExpanded(prev => ({ ...prev, [key]: !prev[key] }));
-                                    if (!aiText[key]) {
-                                      void requestAIExplain(pattern);
-                                    }
-                                  }}
+                                  className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] leading-none text-muted-foreground hover:bg-accent/40"
                                 >
                                   <Info className="h-3 w-3" />
-                                  {aiBusy[stableKeyFromPattern(pattern)] ? String(tAnalytics('states.analyzing')) : String(tAnalytics('insights.explainPattern'))}
+                                  {String(tAnalytics('insights.explainPattern'))}
                                 </button>
-                              </>
-                            )}
+                              </HoverCardTrigger>
+                              <HoverCardContent className="w-80 text-sm leading-relaxed">
+                                <p className="mb-1 font-medium">{String(tAnalytics('insights.patternExplain.title'))}</p>
+                                <p className="text-muted-foreground">
+                                  {String((pattern as PatternResult & { description?: string }).description ?? String(tAnalytics('insights.patternExplain.default')))} 
+                                </p>
+                                <p className="mt-2 text-xs text-muted-foreground/80">
+                                  {String(tAnalytics('insights.patternExplain.disclaimer'))}
+                                </p>
+                              </HoverCardContent>
+                            </HoverCard>
                           </div>
                           <p className="text-sm text-muted-foreground mt-1">
                             {String((pattern as PatternResult & { description?: string }).description ?? '')}
                           </p>
-                          {ENABLE_BIGSTIAN_AI && expanded[stableKeyFromPattern(pattern)] && (
-                            <div className="mt-3 rounded-md border border-primary/20 bg-muted/30 p-3 text-sm">
-                              {aiBusy[stableKeyFromPattern(pattern)] && (
-                                <p className="text-muted-foreground">{String(tAnalytics('states.analyzing'))}</p>
-                              )}
-                              {!aiBusy[stableKeyFromPattern(pattern)] && aiErr[stableKeyFromPattern(pattern)] && (
-                                <p className="text-destructive">{aiErr[stableKeyFromPattern(pattern)]}</p>
-                              )}
-                              {!aiBusy[stableKeyFromPattern(pattern)] && !aiErr[stableKeyFromPattern(pattern)] && (
-                                <>
-                                  <p className="text-foreground/90 whitespace-pre-wrap">{aiText[stableKeyFromPattern(pattern)] || String(tAnalytics('insights.patternExplain.default'))}</p>
-                                  {/* Optional richer fields if present */}
-                                  {/* We display them if orchestrator/prompt returns them in future responses */}
-                                  {/* Keep minimal so UI remains resilient */}
-                                  {false && (
-                                    <div className="mt-2 space-y-1">
-                                      <p className="font-medium">Preliminary thoughts</p>
-                                      <p className="text-muted-foreground">{/* placeholder for preliminaryThoughts */}</p>
-                                      <p className="font-medium mt-2">Be cautious</p>
-                                      <p className="text-amber-600/90">{/* placeholder for uncertaintyNote */}</p>
-                                      <p className="font-medium mt-2">Watch for</p>
-                                      <ul className="list-disc ml-5 text-muted-foreground">
-                                        {/* placeholder for watchFor */}
-                                      </ul>
-                                    </div>
-                                  )}
-                                </>
-                              )}
-                            </div>
-                          )}
                           {pattern.recommendations && (
                             <div className="mt-3">
                               <h5 className="text-sm font-medium mb-2">{String(tAnalytics('insights.recommendations'))}</h5>
@@ -208,12 +144,12 @@ export const PatternsPanel = memo(function PatternsPanel({ filteredData }: Patte
                         </div>
                       </div>
                       <div className="text-right">
-                        <ConfidenceIndicator
-                          confidence={pattern.confidence}
-                          dataPoints={pattern.dataPoints}
-                          timeSpanDays={parseDaysFromTimeframe(pattern.timeframe)}
-                          rSquared={0}
-                        />
+                        <Badge variant="outline" className={getConfidenceColor(pattern.confidence)}>
+                          {String(tAnalytics('insights.confidencePercent', { percentage: Math.round(pattern.confidence * 100) }))}
+                        </Badge>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {String(tAnalytics('confidence.calculation.dataPoints'))}: {pattern.dataPoints}
+                        </p>
                       </div>
                     </div>
                   </CardContent>

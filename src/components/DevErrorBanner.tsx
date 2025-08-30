@@ -55,16 +55,10 @@ export const DevErrorBanner = () => {
     };
 
     const onWindowError = (e: ErrorEvent) => {
-      const msg = e.message || e.error?.message || 'Unhandled error';
-      // Ignore benign ResizeObserver loop errors caused by popovers/dropdowns
-      if (msg.includes('ResizeObserver loop completed') || msg.includes('ResizeObserver loop limit exceeded')) {
-        logger.warn('Ignored benign ResizeObserver error in DevErrorBanner');
-        return;
-      }
-      setLastError({ message: msg, details: e.error?.stack, timestamp: Date.now() });
+      setLastError({ message: e.message || 'Unhandled error', details: e.error?.stack, timestamp: Date.now() });
       setErrorCount(c => c + 1);
       // Log window errors through central logger
-      logger.error('Window error', e.error || new Error(msg));
+      logger.error('Window error', e.error || new Error(e.message));
     };
     const onUnhandledRejection = (e: PromiseRejectionEvent) => {
       const reason = e.reason;

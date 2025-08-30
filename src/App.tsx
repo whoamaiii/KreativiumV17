@@ -3,7 +3,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import React, { Suspense, lazy } from "react";
-import { POC_MODE, IS_PROD, ENABLE_GEMMA_DEMO } from "@/lib/env";
+import { POC_MODE, IS_PROD } from "@/lib/env";
 if (!POC_MODE) {
   await import("@/lib/analyticsConfigOverride");
 }
@@ -37,9 +37,6 @@ import { ErrorWrapper } from "./components/ErrorWrapper";
 
 // Additional lazies for custom routes
 const ReportBuilderPage = lazy(() => import('./pages/ReportBuilderPage').then(m => ({ default: m.default })));
-const GemmaDemo = (!IS_PROD && ENABLE_GEMMA_DEMO)
-  ? lazy(() => import('./pages/GemmaDemo'))
-  : null as unknown as React.LazyExoticComponent<() => JSX.Element>;
 
 // Lazy-loaded Developer Tools page (non-prod/POC only)
 const DevTools = !IS_PROD || POC_MODE
@@ -85,9 +82,6 @@ const App = () => (
                 )}
                 {(!IS_PROD || POC_MODE) && DevTools && (
                   <Route path="/dev-tools" element={<DevTools />} />
-                )}
-                {(!IS_PROD && ENABLE_GEMMA_DEMO) && GemmaDemo && (
-                  <Route path="/dev/gemma-demo" element={<GemmaDemo />} />
                 )}
                 {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
                 <Route path="*" element={<NotFound />} />

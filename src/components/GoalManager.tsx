@@ -19,12 +19,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Goal, Student, GoalDataPoint, Milestone } from "@/types/student";
 import { dataStorage } from "@/lib/dataStorage";
-import { Calendar, Plus, Crosshair, TrendingUp, CheckCircle, Edit, Trash2, Calendar as CalendarIcon, Sparkles } from "lucide-react";
+import { Calendar, Plus, Crosshair, TrendingUp, CheckCircle, Edit, Trash2, Calendar as CalendarIcon } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { logger } from "@/lib/logger";
-import { ENABLE_BIGSTIAN_AI } from "@/lib/env";
-import { generateGoalNextStep } from "@/lib/ai/bigstian/orchestrator";
 
 interface GoalManagerProps {
   student: Student;
@@ -55,9 +53,6 @@ export const GoalManager = ({ student, onGoalUpdate }: GoalManagerProps) => {
     targetValue: 100,
     baselineValue: 0
   });
-  const [aiDraftOpen, setAiDraftOpen] = useState(false);
-  const [aiDraftLoading, setAiDraftLoading] = useState(false);
-  const [aiDraftText, setAiDraftText] = useState('');
 
   /**
    * Load goals for the current student.
@@ -437,45 +432,6 @@ export const GoalManager = ({ student, onGoalUpdate }: GoalManagerProps) => {
                     <Button variant="ghost" size="icon" aria-label="Delete goal" title="Delete goal" onClick={() => deleteGoal(goal.id)}>
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                    {ENABLE_BIGSTIAN_AI && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        aria-label="Draft next step"
-                        title="Draft next step"
-                        onClick={async () => {
-                          setAiDraftOpen(true);
-                          setAiDraftLoading(true);
-                          setAiDraftText('');
-                          try {
-                            const payload = {
-                              timeframe: 'last 30 days',
-                              goal: {
-                                title: goal.title,
-                                description: goal.description,
-                                category: goal.category,
-                                measurableObjective: goal.measurableObjective,
-                                currentProgress: goal.currentProgress,
-                                baselineValue: goal.baselineValue,
-                                targetValue: goal.targetValue,
-                                targetDateISO: goal.targetDate?.toISOString?.() || '',
-                                milestonesCount: goal.milestones?.length || 0,
-                              },
-                            } as const;
-                            const resp = await generateGoalNextStep(payload);
-                            const suggestion = `Objective: ${resp.objective}\nTimeframe: ${resp.timeframe}\nMeasurement: ${resp.measurement}\nSteps:\n- ${resp.steps.join('\n- ')}`;
-                            setAiDraftText(suggestion);
-                          } catch (e) {
-                            setAiDraftText('Failed to draft next step');
-                          } finally {
-                            setAiDraftLoading(false);
-                          }
-                        }}
-                      >
-                        <Sparkles className="h-4 w-4 mr-1" />
-                        Draft next step
-                      </Button>
-                    )}
                   </div>
                 </div>
               </CardHeader>
@@ -582,24 +538,6 @@ export const GoalManager = ({ student, onGoalUpdate }: GoalManagerProps) => {
           ))}
         </div>
       )}
-      <Dialog open={aiDraftOpen} onOpenChange={setAiDraftOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Draft next step</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            {aiDraftLoading ? (
-              <div className="text-sm text-muted-foreground">Generating…</div>
-            ) : (
-              <pre className="whitespace-pre-wrap text-sm bg-muted/50 p-3 rounded">{aiDraftText}</pre>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setAiDraftOpen(false)}>Close</Button>
-              <Button onClick={() => { try { navigator.clipboard?.writeText?.(aiDraftText); toast.success('Copied'); } catch {} }}>Copy</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

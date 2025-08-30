@@ -32,16 +32,15 @@ self.addEventListener('message', (evt: MessageEvent<ReportsWorkerRequest>) => {
   const respond = (data: ReportsWorkerResponse) => (self as unknown as Worker).postMessage(data);
 
   try {
-    respond({ id: msg.id, type: 'progress', progress: 0.05, message: 'Starting export…' });
+    respond({ id: msg.id, type: 'progress', progress: 0.05, message: 'starting' });
 
     const { students, allData, options } = msg.payload;
 
     // Progress hint: filtering window
-    respond({ id: msg.id, type: 'progress', progress: 0.2, message: 'Preparing data…' });
+    respond({ id: msg.id, type: 'progress', progress: 0.2, message: 'preparing' });
 
     let content = '';
     if (msg.kind === 'csv') {
-      respond({ id: msg.id, type: 'progress', progress: 0.35, message: 'Building CSV…' });
       content = ExportSystem.generateCSVExport(students as any[], allData as any, {
         ...(options as any),
         dateRange: options.dateRange
@@ -49,7 +48,6 @@ self.addEventListener('message', (evt: MessageEvent<ReportsWorkerRequest>) => {
           : undefined,
       });
     } else if (msg.kind === 'json') {
-      respond({ id: msg.id, type: 'progress', progress: 0.35, message: 'Packaging JSON…' });
       content = ExportSystem.generateJSONExport(students as any[], allData as any, {
         ...(options as any),
         dateRange: options.dateRange
@@ -58,7 +56,7 @@ self.addEventListener('message', (evt: MessageEvent<ReportsWorkerRequest>) => {
       });
     }
 
-    respond({ id: msg.id, type: 'progress', progress: 0.8, message: 'Finalizing…' });
+    respond({ id: msg.id, type: 'progress', progress: 0.95, message: 'finalizing' });
     respond({ id: msg.id, type: 'success', content, kind: msg.kind });
   } catch (e) {
     respond({ id: msg.id, type: 'error', error: e instanceof Error ? e.message : 'Unknown error' });

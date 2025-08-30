@@ -33,10 +33,6 @@ coverage/
 # Python virtual environment
 mlx-backend/venv/
 
-# Python caches
-__pycache__/
-*.pyc
-
 # Large model files (keep config files)
 public/models/**/*.onnx
 public/models/**/*.bin

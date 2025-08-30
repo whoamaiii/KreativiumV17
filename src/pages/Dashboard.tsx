@@ -19,8 +19,6 @@ import { GlobalMenu } from "@/components/GlobalMenu";
 import { subWeeks, startOfWeek, endOfWeek, isWithinInterval } from 'date-fns';
 import { logger } from "@/lib/logger";
 import { cn } from "@/lib/utils";
-import { useGemma } from "@/hooks/useGemma";
-import { ENABLE_BIGSTIAN_AI } from "@/lib/env";
 
 /**
  * Dashboard component - Main landing page with modern glassmorphism design
@@ -326,16 +324,6 @@ window.addEventListener('storage', handleStorageChange);
                 </Card>
               </div>
 
-              {/* BigstianAI Assistant panel */}
-              {(ENABLE_BIGSTIAN_AI || !IS_PROD) && <GemmaAssistantPanel />}
-              
-              {/* Debug info for BigstianAI */}
-              {!IS_PROD && (
-                <div className="mb-4 p-2 bg-muted/20 rounded text-xs text-muted-foreground">
-                  Debug: ENABLE_BIGSTIAN_AI={String(ENABLE_BIGSTIAN_AI)}, IS_PROD={String(IS_PROD)}
-                </div>
-              )}
-
               {/* Students section */}
               <div>
                 <div 
@@ -475,54 +463,3 @@ window.addEventListener('storage', handleStorageChange);
 };
 
 export { Dashboard };
-
-// Local component to avoid changing routing structure
-const GemmaAssistantPanel = () => {
-  const { ready, model, loading, error, generate, refresh } = useGemma();
-  const [input, setInput] = useState<string>('Write a short parent-friendly weekly summary.');
-  const [response, setResponse] = useState<string>('');
-
-  const onGenerate = async () => {
-    setResponse('');
-    const text = await generate(input, { maxTokens: 192, temperature: 0.3 });
-    setResponse(text);
-  };
-
-  return (
-    <Card className="mb-12 glass-card border border-primary/10">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <h3 className="text-lg font-semibold text-foreground">BigstianAI</h3>
-            <div className="text-xs text-muted-foreground">
-              Model: {model ?? 'loading…'} • Ready: {ready ? 'yes' : 'no'}{error ? ` • Error: ${error}` : ''}
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => refresh()} size="sm">Refresh</Button>
-          </div>
-        </div>
-        <div className="mt-4 grid gap-3">
-          <div className="rounded-xl border border-primary/10 bg-muted/10">
-            <textarea
-              className="w-full h-28 bg-transparent p-3 text-foreground placeholder:text-muted-foreground focus:outline-none"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type a prompt…"
-              aria-label="Gemma prompt"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={onGenerate} disabled={!ready || loading} className="px-5">Generate</Button>
-          </div>
-          <div className="mt-3">
-            <h4 className="text-sm font-medium text-foreground mb-2">Output</h4>
-            <div className="rounded-xl border border-primary/10 bg-background/60">
-              <pre className="whitespace-pre-wrap p-4 text-sm leading-6 text-foreground/90">{response}</pre>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};

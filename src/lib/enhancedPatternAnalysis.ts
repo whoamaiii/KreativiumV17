@@ -25,8 +25,6 @@ import { analyticsConfig } from "@/lib/analyticsConfig";
 import { mlModels, EmotionPrediction, SensoryPrediction, BaselineCluster } from "@/lib/mlModels";
 import { logger } from '@/lib/logger';
 import { pearsonCorrelation, pValueForCorrelation, zScoresMedian, huberRegression } from '@/lib/statistics';
-import { generateExplainability } from '@/lib/ai/bigstian/orchestrator';
-import { ENABLE_BIGSTIAN_AI } from '@/lib/env';
 
 export interface PredictiveInsight {
   type: 'prediction' | 'trend' | 'recommendation' | 'risk';
@@ -467,29 +465,6 @@ class EnhancedPatternAnalysisEngine {
     }
 
     return { level, explanation, factors };
-  }
-
-  // Explain top pattern in human-readable terms via BigstianAI (optional)
-  async explainTopPattern(
-    pattern: string,
-    confidence: number,
-    timeframe: string,
-    contributingFactors: string[]
-  ): Promise<{ text: string; confidenceLevel: 'low' | 'medium' | 'high'; factors: string[] } | null> {
-    if (!ENABLE_BIGSTIAN_AI) return null;
-    try {
-      const result = await generateExplainability({
-        pattern,
-        confidence,
-        timeframe,
-        contributingFactors,
-        options: { maxTokens: 280, temperature: 0.25 },
-      });
-      return result;
-    } catch (error) {
-      logger.error('Explainability generation failed', { error });
-      return null;
-    }
   }
 
   // Anomaly Detection using Statistical Methods

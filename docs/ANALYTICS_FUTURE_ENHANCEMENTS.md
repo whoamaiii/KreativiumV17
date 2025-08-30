@@ -1,15 +1,3 @@
-## BigstianAI språk- og JSON-policy (gjelder alle AI-seksjoner)
-
-Dette dokumenterer de obligatoriske reglene vi har innført for AI-genererte tekster og datakontrakter.
-
-- Språk: All tekst skal være på norsk bokmål (systemprompten håndhever dette).
-- JSON-format: Alle AI-svar returneres som STRICT JSON – uten markdown, uten kodegjerder – pakket mellom `<JSON>` og `</JSON>`.
-- Skjema som må følges for narrativ: `{ "sections": [{ "title": string, "paragraphs": string[], "bullets"?: string[] }], "meta": { "confidence": number (0–1), "tokens"?: number, "timeframe": string } }`.
-- Robust parsing: Klienten forsøker (i rekkefølge) direkte parse, avkoding av `<JSON>`-tagger, sanitering/repair, og en ekstra “fix-to-JSON”-runde som ber modellen selv korrigere til gyldig JSON.
-- Stop-sekvenser: Tjenesten bruker `</JSON>` som stopp-indikator for å hindre overgenerering.
-- Parametere fra miljøvariabler: `VITE_GEMMA_BASE_URL`, `VITE_GEMMA_MAX_TOKENS`, `VITE_GEMMA_TEMPERATURE`, `VITE_GEMMA_TOP_P`, `VITE_GEMMA_REP_PENALTY`.
-- Fallback: Dersom alle reparasjonsforsøk feiler, genereres et trygt minimumsnarrativ som tydelig merkes med “Begrensninger”.
-
 # Analytics: Future Enhancements (Non-Blocking)
 
 This document outlines planned, non-breaking enhancements to the analytics/insights layer. These items improve i18n, formatting consistency, and reduce duplicated config resolution in callers.

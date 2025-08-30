@@ -1,1 +1,0 @@
-class e{charts=new Map;register(t){this.charts.set(t.id,t)}unregister(t){this.charts.delete(t)}get(t){return this.charts.get(t)}all(){return Array.from(this.charts.values())}byStudent(t){return this.all().filter(r=>r.studentId===t)}}const a=new e;export{a as chartRegistry};

@@ -1,7 +1,5 @@
 import { Student, TrackingEntry, EmotionEntry, SensoryEntry, Goal } from "@/types/student";
-import type { NarrativeJson } from '@/lib/ai/bigstian/schemas';
 import { format } from "date-fns";
-import { generateAINarrativeHTML } from '@/lib/utils/aiNarrativeUtils';
 
 // Report content structure for PDF generation
 interface ReportContent {
@@ -63,7 +61,6 @@ export interface ExportOptions {
   groupBy?: 'student' | 'date' | 'goal';
   includeCharts?: boolean;
   anonymize?: boolean;
-  aiNarrative?: NarrativeJson;
 }
 
 export interface BackupData {
@@ -399,8 +396,6 @@ class ExportSystem {
   }
 
   private generateHTMLReport(content: ReportContent, options: ExportOptions): string {
-    const aiSection = generateAINarrativeHTML(options.aiNarrative);
-
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -513,8 +508,6 @@ class ExportSystem {
             ${content.recommendations.map((rec: string) => `<li>${rec}</li>`).join('')}
         </ul>
     </div>
-
-    ${aiSection}
 </body>
 </html>
     `;

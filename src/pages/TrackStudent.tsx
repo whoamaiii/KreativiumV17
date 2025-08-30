@@ -5,15 +5,12 @@ import { EmotionTracker } from "@/components/EmotionTracker";
 import { SensoryTracker } from "@/components/SensoryTracker";
 import { EnvironmentalTracker } from "@/components/EnvironmentalTracker";
 import { Student, EmotionEntry, SensoryEntry, TrackingEntry, EnvironmentalEntry } from "@/types/student";
-import { ArrowLeft, Save, User, Sparkles } from "lucide-react";
+import { ArrowLeft, Save, User } from "lucide-react";
 import { toast } from "sonner";
 import { useTranslation } from "@/hooks/useTranslation";
 import { LanguageSettings } from "@/components/LanguageSettings";
 import { analyticsManager } from "@/lib/analyticsManager";
 import { logger } from "@/lib/logger";
-import { ENABLE_BIGSTIAN_AI } from "@/lib/env";
-import { generateCoachingPlan } from "@/lib/ai/bigstian/orchestrator";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const TrackStudent = () => {
   const { studentId } = useParams();
@@ -25,9 +22,6 @@ const TrackStudent = () => {
   const [generalNotes, setGeneralNotes] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { tTracking, tCommon } = useTranslation();
-  const [coachOpen, setCoachOpen] = useState(false);
-  const [coachLoading, setCoachLoading] = useState(false);
-  const [coachText, setCoachText] = useState('');
 
   useEffect(() => {
     if (!studentId) return;
@@ -214,48 +208,6 @@ const TrackStudent = () => {
           />
         </div>
 
-        {/* Live Coaching (optional) */}
-        {ENABLE_BIGSTIAN_AI && (
-          <div className="mb-8 p-4 rounded-lg border bg-muted/40">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-lg font-semibold text-foreground">Live Coaching</h3>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={async () => {
-                  setCoachOpen(true);
-                  setCoachLoading(true);
-                  setCoachText('');
-                  try {
-                    const stateSummary = `Emotions: ${emotions.length}, Sensory inputs: ${sensoryInputs.length}`;
-                    const env = environmentalData ? JSON.stringify({
-                      room: environmentalData?.roomConditions || {},
-                      context: environmentalData?.context || {}
-                    }) : 'n/a';
-                    const plan = await generateCoachingPlan({
-                      stateSummary,
-                      environment: env,
-                      recentWindow: 'last 10 minutes',
-                    });
-                    const text = [
-                      `Rationale: ${plan.rationale}`,
-                      ...plan.suggestions.map(s => `\n${s.tier.toUpperCase()}: ${s.title}\n- ${s.steps.join('\n- ')}`)
-                    ].join('\n');
-                    setCoachText(text);
-                  } catch (e) {
-                    setCoachText('Failed to load coaching suggestions');
-                  } finally {
-                    setCoachLoading(false);
-                  }
-                }}
-              >
-                <Sparkles className="h-4 w-4 mr-1" /> Suggest actions
-              </Button>
-            </div>
-            <p className="text-sm text-muted-foreground">Get tiered, classroom-safe suggestions based on the most recent session context.</p>
-          </div>
-        )}
-
         {/* Save Session */}
         <div className="flex gap-4">
           <Button
@@ -284,24 +236,6 @@ const TrackStudent = () => {
           </Button>
         </div>
       </div>
-      <Dialog open={coachOpen} onOpenChange={setCoachOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Live coaching suggestions</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            {coachLoading ? (
-              <div className="text-sm text-muted-foreground">Generating…</div>
-            ) : (
-              <pre className="whitespace-pre-wrap text-sm bg-muted/50 p-3 rounded">{coachText}</pre>
-            )}
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setCoachOpen(false)}>Close</Button>
-              <Button onClick={() => { try { navigator.clipboard?.writeText?.(coachText); toast.success('Copied'); } catch {} }}>Copy</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

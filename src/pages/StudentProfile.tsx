@@ -25,10 +25,6 @@ import { analyticsManager } from "@/lib/analyticsManager";
 import { logger } from "@/lib/logger";
 import { dataStorage } from "@/lib/dataStorage";
 import { seedMinimalDemoData } from "@/lib/mockData";
-import { useAIState } from '@/hooks/useAIState';
-import { generateNarrative } from '@/lib/ai/bigstian/orchestrator';
-import { buildReportAnalyticsSummary } from '@/lib/ai/bigstian/context';
-import type { NarrativeJson } from '@/lib/ai/bigstian/schemas';
 
 // Centralized className constants to satisfy react/jsx-no-literals for attribute strings
 const fullScreenCenterCls = "h-screen w-full flex items-center justify-center";
@@ -98,8 +94,6 @@ const StudentProfile = () => {
     reloadGoals,
     reloadData,
   } = useStudentData(studentId);
-  
-  const { aiEnabled } = useAIState();
 
   // DIAGNOSTIC: After data hook
   if (import.meta.env.DEV) {
@@ -331,46 +325,10 @@ const StudentProfile = () => {
 
       switch (format) {
         case 'pdf': {
-          // Generate AI narrative if enabled
-          let aiNarrative: NarrativeJson | undefined;
-          
-          if (aiEnabled) {
-            try {
-              toast.info('Generating AI narrative...');
-              
-              const summaryCtx = buildReportAnalyticsSummary(
-                student,
-                filteredData.entries,
-                filteredData.emotions,
-                filteredData.sensoryInputs,
-                goals,
-                undefined // Use full date range
-              );
-              
-              const input = {
-                studentProfile: { grade: summaryCtx.studentSanitized.grade },
-                timeframe: summaryCtx.summary.timeframe,
-                highlights: summaryCtx.summary.highlights,
-                statsSummary: summaryCtx.summary.statsSummary,
-                goals: summaryCtx.summary.goals,
-              };
-              
-              aiNarrative = await generateNarrative({ 
-                input, 
-                temperature: 0.3, 
-                maxTokens: 384 
-              });
-            } catch (error) {
-              logger.error('Failed to generate AI narrative', { error });
-              // Continue with export even if AI fails
-            }
-          }
-          
           blob = await exportSystem.generatePDFReport(student, exportOptions, {
             format: 'pdf',
             includeFields: ['all'],
             includeCharts: true,
-            aiNarrative,
           });
           // Note: generatePDFReport currently returns an HTML document for printing.
           // Use .html extension to avoid browsers trying to open it as a PDF.
@@ -404,7 +362,7 @@ const StudentProfile = () => {
       const errorMessage = error instanceof Error ? error.message : 'Please try again.';
       toast.error(`Export failed: ${errorMessage}`);
     }
-  }, [student, filteredData, goals, aiEnabled]);
+  }, [student, filteredData, goals]);
   
   /**
    * Creates and triggers the download of a full backup of the student's data.
